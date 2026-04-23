@@ -23,7 +23,7 @@ app.use(requestLoggerMiddleware);
 
 app.use(express.raw({ type: "*/*", limit: "50mb" }));
 
-app.get("/", (req, res) => {
+app.get("/status", (req, res) => {
   res.json({
     message: "Webhook Proxy Active",
     uptime: process.uptime(),
@@ -31,6 +31,12 @@ app.get("/", (req, res) => {
     defaultPort: DEFAULT_PORT,
     timestamp: new Date().toISOString(),
   });
+});
+
+app.all("/", (req, res) => {
+  const queryString = req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : "";
+  const targetUrl = `http://127.0.0.1:${DEFAULT_PORT}/${queryString}`;
+  proxyRequest(req, res, targetUrl);
 });
 
 function proxyRequest(req, res, targetUrl) {
@@ -112,9 +118,16 @@ app.all("/:app/*splat", (req, res) => {
   const appName = req.params.app?.toLowerCase();
   const splats = req.params.splat;
   const remainingPath = splats?.join("/");
+  const isKnownApp = appName && ROUTES[appName];
+  const targetPort = isKnownApp ? ROUTES[appName] : DEFAULT_PORT;
 
-  const targetPort = (appName && ROUTES[appName]) || DEFAULT_PORT;
-  const targetPath = String(remainingPath).startsWith("/") ? remainingPath : `/${remainingPath}`;
+  let targetPath;
+  if (isKnownApp) {
+    targetPath = String(remainingPath).startsWith("/") ? remainingPath : `/${remainingPath}`;
+  } else {
+    targetPath = `/${appName}/${remainingPath}`;
+  }
+
   const queryString = req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : "";
   const targetUrl = `http://127.0.0.1:${targetPort}${targetPath}${queryString}`;
 
@@ -123,21 +136,21 @@ app.all("/:app/*splat", (req, res) => {
 
 app.all("/:app", (req, res) => {
   const appName = req.params.app?.toLowerCase();
+  const isKnownApp = appName && ROUTES[appName];
+  const targetPort = isKnownApp ? ROUTES[appName] : DEFAULT_PORT;
 
-  const targetPort = (appName && ROUTES[appName]) || DEFAULT_PORT;
+  const targetPath = isKnownApp ? "/" : `/${appName}`;
   const queryString = req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : "";
-  const targetUrl = `http://127.0.0.1:${targetPort}/${queryString}`;
+  const targetUrl = `http://127.0.0.1:${targetPort}${targetPath}${queryString}`;
 
   proxyRequest(req, res, targetUrl);
 });
 
 app.use((req, res) => {
-  res.status(404).json({
-    error: "Route not found",
-    path: req.path,
-    available: Object.keys(ROUTES),
-    tip: "Use format: /{app_name}/{endpoint}",
-  });
+  const targetPath = req.path.startsWith("/") ? req.path : `/${req.path}`;
+  const queryString = req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : "";
+  const targetUrl = `http://127.0.0.1:${DEFAULT_PORT}${targetPath}${queryString}`;
+  proxyRequest(req, res, targetUrl);
 });
 
 app.use((err, req, res, next) => {
