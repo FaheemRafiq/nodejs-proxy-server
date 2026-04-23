@@ -6,6 +6,7 @@ import { URL } from "url";
 import ngrok from "@ngrok/ngrok";
 import chalk from "chalk";
 import { requestLoggerMiddleware } from "./requestLogger.js";
+import { ROUTES, DEFAULT_PORT } from "./config.js";
 
 const app = express();
 
@@ -20,14 +21,6 @@ app.use((req, res, next) => {
 
 app.use(requestLoggerMiddleware);
 
-const ROUTES = {
-  kms: 3600,
-  ledger: 3500,
-  app: 8000,
-  ledger2:3501,
-  kms2: 3601
-};
-
 app.use(express.raw({ type: "*/*", limit: "50mb" }));
 
 app.get("/", (req, res) => {
@@ -35,6 +28,7 @@ app.get("/", (req, res) => {
     message: "Webhook Proxy Active",
     uptime: process.uptime(),
     applications: ROUTES,
+    defaultPort: DEFAULT_PORT,
     timestamp: new Date().toISOString(),
   });
 });
@@ -119,17 +113,7 @@ app.all("/:app/*splat", (req, res) => {
   const splats = req.params.splat;
   const remainingPath = splats?.join("/");
 
-  if (!appName || !ROUTES[appName]) {
-    return res.status(404).json({
-      error: "Application not found",
-      requested: appName,
-      available: Object.keys(ROUTES),
-      tip: `Use /${Object.keys(ROUTES)[0]}/webhook, etc.`,
-      example: `${process.env.NGROK_DOMAIN || "your-domain.ngrok-free.app"}/${Object.keys(ROUTES)[0]}/endpoint`,
-    });
-  }
-
-  const targetPort = ROUTES[appName];
+  const targetPort = (appName && ROUTES[appName]) || DEFAULT_PORT;
   const targetPath = String(remainingPath).startsWith("/") ? remainingPath : `/${remainingPath}`;
   const queryString = req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : "";
   const targetUrl = `http://127.0.0.1:${targetPort}${targetPath}${queryString}`;
@@ -140,15 +124,7 @@ app.all("/:app/*splat", (req, res) => {
 app.all("/:app", (req, res) => {
   const appName = req.params.app?.toLowerCase();
 
-  if (!appName || !ROUTES[appName]) {
-    return res.status(404).json({
-      error: "Application not found",
-      requested: appName,
-      available: Object.keys(ROUTES),
-    });
-  }
-
-  const targetPort = ROUTES[appName];
+  const targetPort = (appName && ROUTES[appName]) || DEFAULT_PORT;
   const queryString = req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : "";
   const targetUrl = `http://127.0.0.1:${targetPort}/${queryString}`;
 
@@ -209,11 +185,13 @@ const server = app.listen(PORT, (error) => {
 
   console.log(`\n${chalk.bold("Available Routes:")}`);
   Object.entries(ROUTES).forEach(([name, port]) => {
-    const publicUrl = NGROK_DOMAIN ? `https://${NGROK_DOMAIN}` : `http://localhost:${PORT}`;
     console.log(`  ${chalk.yellow(`/${name}/*`)}  ${chalk.gray("→")}  ${chalk.dim(`http://localhost:${port}`)}`);
   });
 
-  console.log(`\n${chalk.dim(`Example: ${NGROK_DOMAIN ? `https://${NGROK_DOMAIN}` : `http://localhost:${PORT}`}/${Object.keys(ROUTES)[0]}/webhook`)}\n`);
+  console.log(`  ${chalk.yellow("/* (default)")}  ${chalk.gray("→")}  ${chalk.dim(`http://localhost:${DEFAULT_PORT}`)}`);
+
+  const publicUrl = NGROK_DOMAIN ? `https://${NGROK_DOMAIN}` : `http://localhost:${PORT}`;
+  console.log(`\n${chalk.dim(`Example: ${publicUrl}/${Object.keys(ROUTES)[0]}/webhook`)}\n`);
 });
 
 process.on("SIGTERM", () => {
