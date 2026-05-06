@@ -18,3 +18,20 @@ export const ROUTES = {
 };
 
 export const DEFAULT_PORT = 8000;
+
+/**
+ * Per-app log verbosity levels:
+ *   'none'    → no logging
+ *   'minimal' → method, URL, status, duration
+ *   'body'    → minimal + request & response bodies
+ *   'full'    → body + request & response headers
+ *
+ * Apps not listed here fall back to DEFAULT_VERBOSITY.
+ */
+export const LOG_VERBOSITY = {
+  kms: 'full',
+  ledger: 'minimal',
+  btcapi: 'body',
+};
+
+export const DEFAULT_VERBOSITY = 'minimal';

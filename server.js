@@ -60,19 +60,26 @@ function proxyRequest(req, res, targetUrl) {
     timeout: 30000,
   };
 
-  const tag = chalk.magenta(req.id);
-  const method = chalk.bold(req.method);
-  const url = chalk.cyan(req.originalUrl);
-  const target = chalk.yellow(targetUrl);
+  const verbosity = req.logVerbosity || "minimal";
 
-  console.log(`${tag} ${method} ${url} ${chalk.gray("→")} ${target}`);
+  if (verbosity !== "none") {
+    const tag = chalk.magenta(req.id);
+    const method = chalk.bold(req.method);
+    const url = chalk.cyan(req.originalUrl);
+    const target = chalk.yellow(targetUrl);
+
+    console.log(`${tag} ${method} ${url} ${chalk.gray("→")} ${target}`);
+  }
 
   const proxyReq = httpModule.request(options, (proxyRes) => {
-    const status = proxyRes.statusCode >= 400
-      ? chalk.red(proxyRes.statusCode)
-      : chalk.green(proxyRes.statusCode);
+    if (verbosity !== "none") {
+      const tag = chalk.magenta(req.id);
+      const status = proxyRes.statusCode >= 400
+        ? chalk.red(proxyRes.statusCode)
+        : chalk.green(proxyRes.statusCode);
 
-    console.log(`${tag} ${chalk.gray("←")} ${status} ${chalk.gray("from")} ${chalk.dim(parsedTarget.hostname)}`);
+      console.log(`${tag} ${chalk.gray("←")} ${status} ${chalk.gray("from")} ${chalk.dim(parsedTarget.hostname)}`);
+    }
 
     Object.keys(proxyRes.headers).forEach((key) => {
       res.setHeader(key, proxyRes.headers[key]);
@@ -83,7 +90,9 @@ function proxyRequest(req, res, targetUrl) {
   });
 
   proxyReq.on("error", (err) => {
-    console.error(`${tag} ${chalk.red("✗")} ${chalk.red("Proxy error:")} ${chalk.dim(err.message)}`);
+    if (verbosity !== "none") {
+      console.error(`${tag} ${chalk.red("✗")} ${chalk.red("Proxy error:")} ${chalk.dim(err.message)}`);
+    }
 
     if (!res.headersSent) {
       res.status(502).json({
