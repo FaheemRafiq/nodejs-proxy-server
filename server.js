@@ -61,9 +61,9 @@ function proxyRequest(req, res, targetUrl) {
   };
 
   const verbosity = req.logVerbosity || "minimal";
+  const tag = chalk.magenta(req.id);
 
   if (verbosity !== "none") {
-    const tag = chalk.magenta(req.id);
     const method = chalk.bold(req.method);
     const url = chalk.cyan(req.originalUrl);
     const target = chalk.yellow(targetUrl);
@@ -73,7 +73,6 @@ function proxyRequest(req, res, targetUrl) {
 
   const proxyReq = httpModule.request(options, (proxyRes) => {
     if (verbosity !== "none") {
-      const tag = chalk.magenta(req.id);
       const status = proxyRes.statusCode >= 400
         ? chalk.red(proxyRes.statusCode)
         : chalk.green(proxyRes.statusCode);
